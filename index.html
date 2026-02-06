@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dart Tycoon: Ultimate Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+        
+        body { font-family: 'Roboto', sans-serif; background-color: #1a1a1a; color: #e5e5e5; }
+        h1, h2, h3, .stat-value { font-family: 'Orbitron', sans-serif; }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .dart-preview-barrel {
+            background: linear-gradient(90deg, #718096 0%, #cbd5e0 50%, #718096 100%);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+
+        /* Shape Classes */
+        .shape-straight { border-radius: 2px; }
+        .shape-torpedo { border-radius: 100% 10px 10px 100% / 50% 10px 10px 50%; }
+        .shape-bomb { border-radius: 40% 10% 10% 40% / 50% 10% 10% 50%; }
+        .shape-scallop { clip-path: polygon(0 0, 20% 0, 50% 15%, 80% 0, 100% 0, 100% 100%, 80% 100%, 50% 85%, 20% 100%, 0 100%); }
+        
+        /* Coatings */
+        .gold-coating { background: linear-gradient(90deg, #b7791f 0%, #f6e05e 50%, #b7791f 100%) !important; }
+        .rainbow-coating { background: linear-gradient(90deg, #fc8181 0%, #63b3ed 33%, #68d391 66%, #f6ad55 100%) !important; }
+        .black-coating { background: linear-gradient(90deg, #000 0%, #4a5568 50%, #000 100%) !important; }
+
+        .btn-action { transition: all 0.2s; }
+        .btn-action:active { transform: scale(0.95); }
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .health-bar-container { background-color: #2d3748; height: 6px; border-radius: 3px; overflow: hidden; }
+        .health-bar-fill { height: 100%; transition: width 0.3s; }
+        .star-rating { color: #fbbf24; font-size: 0.8rem; }
+        .broken-machine { border-color: #e53e3e !important; opacity: 0.7; }
+        .active-balance { background-color: #2563eb !important; border: 2px solid white; }
+        
+        .trend-up { color: #48bb78; }
+        .trend-down { color: #f56565; }
+        .trend-neutral { color: #a0aec0; }
+
+        .rank-row { transition: background-color 0.2s; }
+        .rank-row:hover { background-color: #2d3748; }
+        .rank-player { background-color: #2b6cb040; border-left: 4px solid #4299e1; }
+        .rank-owned { opacity: 0.5; text-decoration: line-through; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2d3748; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #718096; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- TOP STATS BAR -->
+    <header class="bg-gray-900 border-b border-gray-700 p-3 shadow-lg z-20">
+        <div class="flex flex-wrap justify-between items-center gap-4 max-w-7xl mx-auto w-full">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-bullseye text-red-600 text-2xl"></i>
+                <div>
+                    <h1 class="text-lg font-bold leading-none text-white" id="company-name-display">Loading...</h1>
+                    <div class="text-xs text-gray-400" id="date-display">Week 1, Year 1</div>
+                </div>
+            </div>
+            
+            <div class="flex gap-4 md:gap-8 text-sm md:text-base flex-1 justify-center">
+                <div class="flex flex-col items-center">
+                    <span class="text-xs text-gray-400">Capital</span>
+                    <span class="stat-value text-green-400" id="cash-display">€25,000</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-xs text-gray-400">Reputation</span>
+                    <span class="stat-value text-yellow-400" id="rep-display">Unknown</span>
+                </div>
+                <div class="flex flex-col items-center border-l border-gray-700 pl-4">
+                    <span class="text-xs text-gray-400">Material Cost</span>
+                    <span class="stat-value text-blue-300">€<span id="market-price">50</span>/unit</span>
+                </div>
+            </div>
+
+            <button onclick="advanceWeek()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold btn-action shadow-lg border-b-4 border-blue-800">
+                Next Week <i class="fa-solid fa-forward ml-1"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME AREA -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- SIDEBAR NAV -->
+        <nav class="w-16 md:w-64 bg-gray-800 border-r border-gray-700 flex flex-col overflow-y-auto">
+            <button onclick="switchTab('dashboard')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-blue-500 active text-blue-400 border-blue-500 transition-colors">
+                <i class="fa-solid fa-chart-line text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Dashboard</span>
+            </button>
+            <button onclick="switchTab('design')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-red-500 transition-colors">
+                <i class="fa-solid fa-pen-ruler text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Design Studio</span>
+            </button>
+            <button onclick="switchTab('factory')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-orange-500 transition-colors">
+                <i class="fa-solid fa-industry text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Factory</span>
+            </button>
+            <button onclick="switchTab('marketing')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-purple-500 transition-colors">
+                <i class="fa-solid fa-users-viewfinder text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Marketing</span>
+            </button>
+            <button onclick="switchTab('staff')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-green-500 transition-colors">
+                <i class="fa-solid fa-users text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Staff & R&D</span>
+            </button>
+             <button onclick="switchTab('management')" class="nav-btn p-4 hover:bg-gray-700 text-left border-l-4 border-transparent hover:border-gray-500 transition-colors">
+                <i class="fa-solid fa-trophy text-xl md:mr-3"></i> <span class="hidden md:inline font-bold">Rankings</span>
+            </button>
+        </nav>
+
+        <!-- CONTENT PANELS -->
+        <main class="flex-1 bg-gray-900 relative overflow-y-auto p-4 md:p-6" id="main-content">
+            
+            <!-- DASHBOARD -->
+            <div id="tab-dashboard" class="space-y-6">
+                <h2 class="text-2xl font-bold mb-4">Market Overview</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Current Project Status -->
+                    <div class="bg-gray-800 p-6 rounded-lg shadow border border-gray-700 col-span-1 md:col-span-2">
+                        <h3 class="text-xl font-bold mb-2 text-blue-400">Production Line</h3>
+                        <div id="active-project-ui">
+                            <p class="text-gray-400 italic">No active project. Go to Design Studio to start.</p>
+                        </div>
+                    </div>
+
+                    <!-- Market Trends -->
+                    <div class="bg-gray-800 p-6 rounded-lg shadow border border-gray-700">
+                        <h3 class="text-xl font-bold mb-2 text-pink-400"><i class="fa-solid fa-arrow-trend-up"></i> Market Meta</h3>
+                        <p class="text-xs text-gray-400 mb-3">Matching trends is critical. Mismatching = Sales Penalty.</p>
+                        
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between border-b border-gray-700 pb-1">
+                                <span>Shape:</span>
+                                <span class="font-bold text-green-400" id="trend-shape">Straight</span>
+                            </div>
+                            <div class="flex justify-between border-b border-gray-700 pb-1">
+                                <span>Grip Preference:</span>
+                                <span class="font-bold text-green-400" id="trend-grip">Level 2</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Balance:</span>
+                                <span class="font-bold text-green-400" id="trend-balance">Center</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Sales (Split Core/Drops) -->
+                    <div class="bg-gray-800 p-6 rounded-lg shadow border border-gray-700 col-span-1 md:col-span-3">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-green-400">Sales Channels</h3>
+                            <div class="text-xs text-gray-400">Core Range = Steady | Drops = Fast Decay</div>
+                        </div>
+                        <div id="sales-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <p class="text-gray-500">No active products.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DESIGN STUDIO -->
+            <div id="tab-design" class="hidden space-y-6 max-w-5xl mx-auto">
+                <h2 class="text-2xl font-bold mb-4">Design New Dart</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Controls -->
+                    <div class="space-y-4 bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-400 mb-1">Model Name</label>
+                            <input type="text" id="design-name" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white" placeholder="e.g. The Eliminator">
+                        </div>
+
+                        <!-- SHAPE & GRIP & BALANCE -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Barrel Shape</label>
+                                <select id="shape-select" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white text-sm" onchange="updateVisuals(); updateEstimates()">
+                                    <option value="straight">Straight</option>
+                                    <option value="torpedo">Torpedo (+€1k Dev)</option>
+                                    <option value="bomb">Bomb (+€2k Dev)</option>
+                                    <option value="scallop">Scallop (+€2.5k Dev)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Grip Level</label>
+                                <select id="grip-select" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white text-sm" onchange="updateVisuals(); updateEstimates()">
+                                    <option value="1">Lvl 1: Smooth</option>
+                                    <option value="2">Lvl 2: Standard</option>
+                                    <option value="3">Lvl 3: Micro</option>
+                                    <option value="4">Lvl 4: Aggressive</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-gray-400 mb-1">Weight Distribution</label>
+                            <div class="flex gap-2">
+                                <button onclick="setBalance('front')" id="bal-front" class="flex-1 p-2 bg-gray-700 rounded text-xs hover:bg-gray-600 border border-transparent">Front</button>
+                                <button onclick="setBalance('center')" id="bal-center" class="flex-1 p-2 bg-blue-600 active-balance rounded text-xs hover:bg-blue-500 border border-transparent">Center</button>
+                                <button onclick="setBalance('rear')" id="bal-rear" class="flex-1 p-2 bg-gray-700 rounded text-xs hover:bg-gray-600 border border-transparent">Rear</button>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-gray-700 pt-3">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Tungsten % <span id="tungsten-val" class="text-blue-400 float-right">90%</span></label>
+                                <input type="range" id="tungsten-slider" min="80" max="97" value="90" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                            </div>
+
+                            <!-- Batch Size Slider -->
+                            <div class="mt-2">
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Production Batch Size: <span id="batch-display" class="text-green-400">2000</span> units</label>
+                                <input type="range" id="batch-slider" min="500" max="10000" step="100" value="2000" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mt-2">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-400 mb-1">Packaging</label>
+                                    <select id="packaging-select" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white text-sm" onchange="updateEstimates()">
+                                        <option value="blister">Blister Pack (Cheap)</option>
+                                        <option value="box">Standard Box (+€1 Cost)</option>
+                                        <option value="premium">Premium Case (+€4 Cost)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-400 mb-1">Weight Options</label>
+                                    <select id="weight-options" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white text-sm" onchange="updateEstimates()">
+                                        <option value="1">1 Option</option>
+                                        <option value="3">3 Options</option>
+                                        <option value="5">5 Options</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-2">
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Target Market / IP</label>
+                                <select id="edition-select" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white" onchange="updateEstimates()">
+                                    <option value="standard">Standard</option>
+                                    <option value="player">Pro Signature (+€5k)</option>
+                                    <option value="ip_small">IP: Local (+€2k)</option>
+                                    <option value="ip_med">IP: Movie (+€15k)</option>
+                                    <option value="ip_large">IP: Global Sports (+€50k)</option>
+                                </select>
+                            </div>
+
+                            <div class="mt-2">
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Coating</label>
+                                <div class="flex gap-1">
+                                    <button onclick="setCoating('natural')" class="flex-1 p-2 bg-gray-600 rounded text-xs">Nat</button>
+                                    <button onclick="setCoating('black')" class="flex-1 p-2 bg-gray-900 rounded text-xs border border-gray-600">Blk</button>
+                                    <button onclick="setCoating('gold')" class="flex-1 p-2 bg-yellow-600 rounded text-xs">Gold</button>
+                                    <button onclick="setCoating('rainbow')" class="flex-1 p-2 bg-gradient-to-r from-pink-500 to-blue-500 rounded text-xs">Rbw</button>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <label class="block text-sm font-bold text-gray-400 mb-1">Retail Price: €<span id="price-display">60</span></label>
+                                <input type="range" id="price-slider" min="30" max="250" value="60" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-600">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Unit Cost:</span>
+                                <span class="text-yellow-400" id="unit-cost">€12.50</span>
+                            </div>
+                            <div class="flex justify-between text-lg font-bold mb-4">
+                                <span>Total Cost:</span>
+                                <span class="text-red-400" id="total-cost">€2,000</span>
+                            </div>
+                            <button onclick="startProject()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded shadow-lg btn-action">
+                                START DEVELOPMENT & PRODUCTION
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Visualizer -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 flex flex-col items-center justify-center">
+                        <div class="w-full h-64 bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden mb-4 p-8">
+                            <div class="relative w-full flex items-center justify-center">
+                                <div class="w-8 h-1 bg-gray-500 rounded-l-full"></div>
+                                <div id="preview-barrel" class="w-32 h-8 dart-preview-barrel shape-straight relative z-10 mx-0 overflow-hidden">
+                                    <div id="preview-grip" class="absolute inset-0 opacity-30" style="background-image: repeating-linear-gradient(90deg, transparent, transparent 4px, #000 4px, #000 5px);"></div>
+                                </div>
+                                <div class="w-12 h-2 bg-gray-200"></div>
+                                <div class="w-16 h-12 bg-blue-500 clip-flight transform -translate-x-1" style="clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%);"></div>
+                            </div>
+                            <div class="absolute bottom-2 right-2 text-xs text-gray-500 font-mono text-right" id="preview-specs">
+                                90% W - Natural<br>
+                                Straight - Lvl 2 Grip
+                            </div>
+                        </div>
+                        
+                        <div class="w-full">
+                            <h3 class="font-bold text-gray-300 mb-2">Trend Alignment</h3>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs w-12">Meta Match</span>
+                                <div class="flex-1 bg-gray-700 h-2 rounded"><div id="meta-match-bar" class="bg-pink-500 h-2 rounded" style="width: 50%"></div></div>
+                            </div>
+                            
+                            <h3 class="font-bold text-gray-300 mb-2">Projected Rating</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs w-12">Quality</span>
+                                <div class="flex-1 bg-gray-700 h-2 rounded"><div id="proj-quality-bar" class="bg-green-500 h-2 rounded" style="width: 50%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FACTORY -->
+            <div id="tab-factory" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold mb-4">Supply Chain & Upgrades</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Machinery -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700" id="lathe-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-xl font-bold text-orange-400">CNC Lathes</h3>
+                            <span class="bg-gray-700 px-2 rounded text-xs py-1">Lvl <span id="lathe-lvl">1</span></span>
+                        </div>
+                        <div class="mb-4">
+                            <div class="flex justify-between text-xs text-gray-400 mb-1"><span>Condition</span><span id="lathe-health-text">100%</span></div>
+                            <div class="health-bar-container"><div id="lathe-health-bar" class="health-bar-fill bg-green-500" style="width: 100%"></div></div>
+                            <p class="text-xs text-red-400 mt-1 hidden" id="lathe-broken-msg">BROKEN - PRODUCTION HALTED</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="upgradeMachine('lathe')" class="flex-1 bg-gray-700 border border-gray-600 hover:bg-gray-600 rounded py-2 text-sm font-bold">Upgrade (€<span id="lathe-cost">3000</span>)</button>
+                            <button onclick="repairMachine('lathe')" class="bg-blue-600 hover:bg-blue-500 px-4 rounded text-white text-sm font-bold"><i class="fa-solid fa-wrench"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700" id="laser-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-xl font-bold text-purple-400">Laser Engraver</h3>
+                            <span class="bg-gray-700 px-2 rounded text-xs py-1">Lvl <span id="laser-lvl">0</span></span>
+                        </div>
+                        <div class="mb-4">
+                             <div class="flex justify-between text-xs text-gray-400 mb-1"><span>Condition</span><span id="laser-health-text">N/A</span></div>
+                            <div class="health-bar-container"><div id="laser-health-bar" class="health-bar-fill bg-gray-600" style="width: 100%"></div></div>
+                             <p class="text-xs text-red-400 mt-1 hidden" id="laser-broken-msg">BROKEN - VALUE DROP</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="upgradeMachine('laser')" class="flex-1 bg-gray-700 border border-gray-600 hover:bg-gray-600 rounded py-2 text-sm font-bold"><span id="laser-btn-text">Install (€5000)</span></button>
+                            <button onclick="repairMachine('laser')" class="bg-blue-600 hover:bg-blue-500 px-4 rounded text-white text-sm font-bold"><i class="fa-solid fa-wrench"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- 3D Printing -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-xl font-bold mb-4 text-blue-400">Accessory Shop</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-gray-400">Weekly Revenue:</span>
+                            <span class="font-bold text-green-400" id="accessory-income">€0</span>
+                        </div>
+                        <button onclick="buyPrinter()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold mb-2">Add 3D Printer (€1,500)</button>
+                        <p class="text-xs text-center text-gray-500">Printers Owned: <span id="printer-count">0</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MARKETING -->
+            <div id="tab-marketing" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold mb-4">Marketing & Team Management</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Pro Team Roster -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 md:col-span-2">
+                        <h3 class="text-xl font-bold mb-4 text-blue-400"><i class="fa-solid fa-shirt"></i> Pro Team Roster</h3>
+                        <p class="text-sm text-gray-400 mb-4">Sponsored players compete weekly. Wins boost reputation and sales.</p>
+                        
+                        <div id="pro-team-list" class="space-y-3 mb-4">
+                            <!-- JS populated -->
+                            <p class="text-gray-500 italic">No players signed.</p>
+                        </div>
+
+                        <div class="flex gap-4 border-t border-gray-700 pt-4">
+                            <button onclick="signPlayer('rookie')" class="flex-1 bg-gray-700 hover:bg-gray-600 p-3 rounded text-left">
+                                <div class="font-bold">Sign Rookie</div>
+                                <div class="text-xs text-gray-400">Cost: €200/wk | Skill: Low</div>
+                            </button>
+                            <button onclick="signPlayer('pro')" class="flex-1 bg-gray-700 hover:bg-gray-600 p-3 rounded text-left">
+                                <div class="font-bold">Sign Contender</div>
+                                <div class="text-xs text-gray-400">Cost: €800/wk | Skill: Med</div>
+                            </button>
+                             <button onclick="signPlayer('legend')" class="flex-1 bg-gray-700 hover:bg-gray-600 p-3 rounded text-left">
+                                <div class="font-bold">Sign Legend</div>
+                                <div class="text-xs text-gray-400">Cost: €3000/wk | Skill: High</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Influencers -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-lg font-bold mb-2 text-pink-500">Social Media</h3>
+                        <button onclick="sponsor('youtuber')" class="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 p-3 rounded mb-2 text-left">
+                            <div class="font-bold">"DartGuy180" Review</div>
+                            <div class="text-xs text-gray-400">Cost: €500 | Hype Boost</div>
+                        </button>
+                         <button onclick="sponsor('influencer')" class="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 p-3 rounded text-left">
+                            <div class="font-bold">"Tungsten King" Shoutout</div>
+                            <div class="text-xs text-gray-400">Cost: €2,500 | Massive Hype</div>
+                        </button>
+                    </div>
+
+                    <!-- Events -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-lg font-bold mb-2 text-yellow-500">Events</h3>
+                        <button onclick="runFanCompetition()" class="w-full bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-3 rounded mb-3">
+                            Run Fan Design Competition (€1000)
+                        </button>
+                        <p class="text-xs text-gray-400">Engage fans to discover new trends.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAFF -->
+            <div id="tab-staff" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold mb-4">Staff & Development</h2>
+                <div class="mb-4 bg-gray-800 p-4 rounded text-sm text-gray-300 border border-gray-700">
+                    <p><strong>Management Tip:</strong> Higher star ratings increase efficiency but raise wages significantly. Balance quality with cost.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-xl font-bold mb-4">Department Heads</h3>
+                        <div class="space-y-6">
+                            <!-- Departments Loop -->
+                            <div id="staff-container"></div> 
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-xl font-bold mb-4">Tech R&D</h3>
+                        <div class="space-y-3">
+                            <button onclick="research('stems')" class="w-full flex justify-between items-center bg-gray-700 p-3 rounded hover:bg-gray-600"><span>Carbon Stems</span><span class="text-yellow-400 font-bold">€1,500</span></button>
+                            <button onclick="research('points')" class="w-full flex justify-between items-center bg-gray-700 p-3 rounded hover:bg-gray-600"><span>Swiss-Style Points</span><span class="text-yellow-400 font-bold">€3,000</span></button>
+                            <button onclick="research('flights')" class="w-full flex justify-between items-center bg-gray-700 p-3 rounded hover:bg-gray-600"><span>Molded Flights</span><span class="text-yellow-400 font-bold">€2,000</span></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MANAGEMENT / LEGACY / RANKINGS -->
+            <div id="tab-management" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold mb-4">Management & Legacy</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Global Rankings -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 md:col-span-2">
+                        <h3 class="text-xl font-bold mb-4 text-green-400"><i class="fa-solid fa-list-ol"></i> Global Industry Rankings</h3>
+                        <p class="text-sm text-gray-400 mb-4">Climb the reputation ladder. You can only acquire companies you have overtaken.</p>
+                        
+                        <div class="overflow-x-auto max-h-96">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-900 text-gray-400 uppercase font-bold sticky top-0">
+                                    <tr>
+                                        <th class="p-3">Rank</th>
+                                        <th class="p-3">Company</th>
+                                        <th class="p-3">Reputation</th>
+                                        <th class="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rankings-table" class="overflow-y-auto">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Legacy Museum -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <h3 class="text-xl font-bold mb-4 text-purple-300"><i class="fa-solid fa-landmark"></i> Dart Museum</h3>
+                        <p class="text-sm text-gray-400 mb-4">Review your past creations. Produce more from the archive.</p>
+                        <div id="legacy-list" class="space-y-3 max-h-64 overflow-y-auto">
+                            <p class="text-gray-500 italic">No legacy products yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Brand -->
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                         <h3 class="text-xl font-bold mb-4 text-white">Administration</h3>
+                         <div class="flex flex-col gap-4">
+                             <button onclick="promptRebrand()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">Rebrand Company (€10,000)</button>
+                             <button onclick="confirmReset()" class="bg-red-900 hover:bg-red-700 text-white font-bold py-2 px-4 rounded border border-red-600">RESET PROGRESS</button>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MODAL -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 border-2 border-gray-600 rounded-lg max-w-md w-full p-6 shadow-2xl transform transition-all scale-100">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4 text-white font-orbitron">Alert</h2>
+            <div id="modal-content" class="mb-6 text-gray-300">Content</div>
+            <div id="modal-input-container" class="hidden mb-4"><input type="text" id="modal-input" class="w-full bg-gray-900 border border-gray-500 rounded p-2 text-white" placeholder="Enter quantity..." type="number"></div>
+            
+            <!-- Launch Options (Hidden by default) -->
+            <div id="launch-options" class="hidden grid grid-cols-2 gap-4">
+                <button onclick="finalizeLaunch('drop')" class="bg-purple-600 hover:bg-purple-500 p-3 rounded font-bold text-center">
+                    <div>Limited Drop</div>
+                    <div class="text-xs font-normal">High Hype, Fast Sales Decay</div>
+                </button>
+                <button onclick="finalizeLaunch('core')" class="bg-blue-600 hover:bg-blue-500 p-3 rounded font-bold text-center">
+                    <div>Core Range</div>
+                    <div class="text-xs font-normal">Steady Sales, Long Life</div>
+                </button>
+            </div>
+
+            <div class="flex gap-2 mt-4">
+                <button id="modal-cancel-btn" onclick="closeModal()" class="hidden flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 rounded">Cancel</button>
+                <button id="modal-confirm-btn" onclick="closeModal()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME STATE ---
+        let game = {
+            companyName: "Loading...",
+            cash: 25000,
+            reputation: 10,
+            fans: 100,
+            week: 1,
+            hype: 0,
+            
+            // Market
+            tungstenPrice: 50,
+            // tungstenStock removed
+            trends: { shape: 'straight', grip: 2, balance: 'center' },
+            trendTimer: 10,
+            
+            // Tech/Machines
+            lathe: { level: 1, health: 100 },
+            laser: { level: 0, health: 100 },
+            printers: 0,
+            tech: { stems: false, points: false, flights: false },
+            
+            // Staff { count, stars }
+            staff: { 
+                design: { count: 1, stars: 1 }, 
+                engineer: { count: 1, stars: 1 }, 
+                marketing: { count: 1, stars: 1 } 
+            },
+            
+            // Pro Team { name, skill, wins, id }
+            team: [],
+            
+            // Business
+            activeDrops: [], // Drops + Core Range
+            legacyDarts: [],
+            project: null,
+            personalization: false,
+            
+            // Rivals
+            competitors: [
+                { id: 'r20', name: "Dubz'n'Zubz", cost: 10000, rep: 50, desc: 'Basement startup.', bought: false },
+                { id: 'r19', name: "Rusty Points Ltd", cost: 20000, rep: 250, desc: 'Old machinery, loyal locals.', bought: false },
+                { id: 'r18', name: "Pub League Pro", cost: 35000, rep: 500, desc: 'Budget bar darts.', bought: false },
+                { id: 'r17', name: "Basement Darts", cost: 50000, rep: 1000, desc: 'Online only retailer.', bought: false },
+                { id: 'r16', name: "Sharp Shooters", cost: 75000, rep: 2000, desc: 'Good points tech.', bought: false },
+                { id: 'r15', name: "Pointless Inc", cost: 100000, rep: 3500, desc: 'Molded flight specialists.', bought: false },
+                { id: 'r14', name: "Flight Club", cost: 125000, rep: 5000, desc: 'Trendy social venues.', bought: false },
+                { id: 'r13', name: "Spin Doctor", cost: 150000, rep: 7500, desc: 'Spinning shaft patent.', bought: false },
+                { id: 'r12', name: "Dart Vader Co", cost: 200000, rep: 10000, desc: 'Novelty licensed gear.', bought: false },
+                { id: 'r11', name: "Treble Makers", cost: 250000, rep: 15000, desc: 'Mid-range reliable.', bought: false },
+                { id: 'r10', name: "The 180 Factory", cost: 300000, rep: 20000, desc: 'Mass production giant.', bought: false },
+                { id: 'r9', name: "Shaft & Barrel", cost: 400000, rep: 25000, desc: 'Classic designs.', bought: false },
+                { id: 'r8', name: "Precision Point", cost: 500000, rep: 30000, desc: 'Swiss engineering.', bought: false },
+                { id: 'r7', name: "Velocity Darts", cost: 650000, rep: 40000, desc: 'Aerodynamic focus.', bought: false },
+                { id: 'r6', name: "Oche Kings", cost: 800000, rep: 50000, desc: 'Sponsors top tourneys.', bought: false },
+                { id: 'r5', name: "Arrow Dynamics", cost: 1000000, rep: 75000, desc: 'Grip tech.', bought: false },
+                { id: 'r4', name: "Tungsten Titans", cost: 1500000, rep: 100000, desc: '97% Tungsten mastery.', bought: false },
+                { id: 'r3', name: "FlightMaster Ltd", cost: 2000000, rep: 150000, desc: 'Global logistics.', bought: false },
+                { id: 'r2', name: "Bullseye Inc", cost: 5000000, rep: 250000, desc: 'Industry veteran.', bought: false },
+                { id: 'r1', name: "Apex Global", cost: 10000000, rep: 500000, desc: 'Market Dominator.', bought: false }
+            ]
+        };
+
+        const WEEKLY_EXPENSES_BASE = 500; 
+        const TREND_SHAPES = ['straight', 'torpedo', 'bomb', 'scallop'];
+        const TREND_BALANCES = ['front', 'center', 'rear'];
+
+        // --- CORE & PERSISTENCE ---
+
+        function initGame() {
+            const saved = localStorage.getItem('dartTycoonUltSave');
+            if (saved) {
+                try {
+                    const loaded = JSON.parse(saved);
+                    game = { ...game, ...loaded };
+                    
+                    // Cleanup old stock variable if present
+                    if(game.tungstenStock) delete game.tungstenStock;
+                    
+                    if(!game.team) game.team = [];
+                    if(!game.legacyDarts) game.legacyDarts = [];
+                    if(!game.tungstenPrice) game.tungstenPrice = 50;
+                    if(!game.trends) randomizeTrends();
+                    
+                    if(game.competitors.length < 20) {
+                        game.competitors = [
+                            { id: 'r20', name: "Dubz'n'Zubz", cost: 10000, rep: 50, desc: 'Basement startup.', bought: false },
+                            { id: 'r19', name: "Rusty Points Ltd", cost: 20000, rep: 250, desc: 'Old machinery.', bought: false },
+                            { id: 'r18', name: "Pub League Pro", cost: 35000, rep: 500, desc: 'Budget bar darts.', bought: false },
+                            { id: 'r17', name: "Basement Darts", cost: 50000, rep: 1000, desc: 'Online retailer.', bought: false },
+                            { id: 'r16', name: "Sharp Shooters", cost: 75000, rep: 2000, desc: 'Tech focus.', bought: false },
+                            { id: 'r15', name: "Pointless Inc", cost: 100000, rep: 3500, desc: 'Molded flights.', bought: false },
+                            { id: 'r14', name: "Flight Club", cost: 125000, rep: 5000, desc: 'Venues.', bought: false },
+                            { id: 'r13', name: "Spin Doctor", cost: 150000, rep: 7500, desc: 'Spinning shafts.', bought: false },
+                            { id: 'r12', name: "Dart Vader Co", cost: 200000, rep: 10000, desc: 'Novelty.', bought: false },
+                            { id: 'r11', name: "Treble Makers", cost: 250000, rep: 15000, desc: 'Mid-range.', bought: false },
+                            { id: 'r10', name: "The 180 Factory", cost: 300000, rep: 20000, desc: 'Mass production.', bought: false },
+                            { id: 'r9', name: "Shaft & Barrel", cost: 400000, rep: 25000, desc: 'Classic.', bought: false },
+                            { id: 'r8', name: "Precision Point", cost: 500000, rep: 30000, desc: 'Swiss tech.', bought: false },
+                            { id: 'r7', name: "Velocity Darts", cost: 650000, rep: 40000, desc: 'Aero.', bought: false },
+                            { id: 'r6', name: "Oche Kings", cost: 800000, rep: 50000, desc: 'Tourney sponsor.', bought: false },
+                            { id: 'r5', name: "Arrow Dynamics", cost: 1000000, rep: 75000, desc: 'Grip tech.', bought: false },
+                            { id: 'r4', name: "Tungsten Titans", cost: 1500000, rep: 100000, desc: '97% Tungsten.', bought: false },
+                            { id: 'r3', name: "FlightMaster Ltd", cost: 2000000, rep: 150000, desc: 'Logistics.', bought: false },
+                            { id: 'r2', name: "Bullseye Inc", cost: 5000000, rep: 250000, desc: 'Veteran.', bought: false },
+                            { id: 'r1', name: "Apex Global", cost: 10000000, rep: 500000, desc: 'Dominator.', bought: false }
+                        ];
+                    }
+                    
+                    updateUI();
+                } catch(e) { console.error("Save corrupt", e); }
+            } else {
+                showInputModal("Skellium Games", "Skellium Games invites you to start the best darts company. Name your enterprise:", (name) => {
+                    game.companyName = name || "Unnamed Darts Co.";
+                    randomizeTrends();
+                    saveGame();
+                    updateUI();
+                });
+            }
+            renderCompetitors();
+            updateEstimates();
+            renderStaffControls();
+        }
+
+        function saveGame() { localStorage.setItem('dartTycoonUltSave', JSON.stringify(game)); }
+
+        // --- GAME LOOP ---
+
+        function advanceWeek() {
+            if(game.project && game.project.progress >= 100) {
+                finishProjectProduction();
+                return;
+            }
+
+            game.week++;
+            let modalOpened = false;
+            
+            // 1. Market Fluctuations
+            let drift = Math.floor(Math.random() * 11) - 5; 
+            game.tungstenPrice += drift;
+            if(game.tungstenPrice < 30) game.tungstenPrice = 30;
+            if(game.tungstenPrice > 100) game.tungstenPrice = 100;
+            
+            // Trend Shift
+            game.trendTimer--;
+            if(game.trendTimer <= 0) {
+                randomizeTrends();
+                game.trendTimer = 15 + Math.floor(Math.random() * 10);
+                showModal("Trend Alert!", "The market preferences have shifted! Check the Dashboard.");
+                modalOpened = true;
+            }
+
+            // 2. Expenses
+            let expenses = WEEKLY_EXPENSES_BASE;
+            expenses += (game.staff.design.count * 300 * game.staff.design.stars);
+            expenses += (game.staff.engineer.count * 400 * game.staff.engineer.stars);
+            expenses += (game.staff.marketing.count * 350 * game.staff.marketing.stars);
+            
+            game.team.forEach(p => {
+                let salary = p.skill === 'Low' ? 300 : (p.skill === 'Med' ? 1000 : 5000);
+                expenses += salary;
+            });
+
+            if (game.project && game.lathe.health > 0) game.lathe.health -= (1.5 + game.lathe.level * 0.5);
+            if (game.laser.level > 0 && game.personalization) game.laser.health -= 2;
+            
+            if(game.lathe.health < 0) game.lathe.health = 0;
+            if(game.laser.level > 0 && game.laser.health < 0) game.laser.health = 0;
+
+            if (game.cash < expenses && !modalOpened) {
+                showModal("Warning", "Cash reserves critical!");
+                modalOpened = true;
+            }
+            game.cash -= expenses;
+
+            // BAILOUT
+            if (game.cash < -5000 && game.activeDrops.length === 0) {
+                game.cash = 2000;
+                game.reputation = Math.max(0, game.reputation - 50);
+                showModal("Bailout", "Skellium Games intervened to save you from bankruptcy. Reputation reset, small cash injection provided.");
+                modalOpened = true;
+            }
+
+            // 3. Passive Income & Hype
+            game.cash += game.printers * 150;
+            game.hype = Math.max(0, game.hype * 0.9);
+            game.hype += (game.staff.marketing.count * game.staff.marketing.stars * 1.5);
+            if(game.hype > 100) game.hype = 100;
+
+            // 4. Pro Tournaments
+            simulateTournaments();
+
+            // 5. Production
+            if (game.project && game.lathe.health > 0) {
+                const speed = 10 + (game.staff.engineer.count * game.staff.engineer.stars * 5) + (game.lathe.level * 5);
+                
+                // Restock is faster
+                let finalSpeed = speed;
+                if(game.project.isRestock) finalSpeed *= 1.5;
+
+                game.project.progress += finalSpeed;
+                if (game.project.progress >= 100) {
+                    finishProjectProduction();
+                    modalOpened = true; 
+                }
+            }
+
+            // 6. Random Events
+            if(!modalOpened && Math.random() < 0.10) {
+                triggerRandomEvent(); 
+                modalOpened = true;
+            }
+
+            // 7. Sales Logic
+            processSales();
+
+            saveGame();
+            updateUI();
+        }
+
+        function triggerRandomEvent() {
+            const events = [
+                { title: "Machine Breakdown", text: "Your main lathe suffered a critical failure.", effect: () => game.lathe.health = Math.max(0, game.lathe.health - 40) },
+                { title: "Viral Video", text: "An influencer loved your darts! Hype +25.", effect: () => game.hype = Math.min(100, game.hype + 25) },
+                { title: "Tax Audit", text: "Unexpected fees. Cash -€2000.", effect: () => game.cash -= 2000 },
+                { title: "Design Leak", text: "Competitors copied your style. Hype -10.", effect: () => game.hype = Math.max(0, game.hype - 10) }
+            ];
+            const ev = events[Math.floor(Math.random() * events.length)];
+            ev.effect();
+            showModal(ev.title, ev.text);
+        }
+
+        function processSales() {
+            let totalRevenue = 0;
+            for (let i = game.activeDrops.length - 1; i >= 0; i--) {
+                let drop = game.activeDrops[i];
+                let demand = (drop.quality * 1.5) + (game.reputation * 0.1) + (game.fans * 0.01);
+                
+                let trendBonus = 1.0;
+                if(drop.shape === game.trends.shape) trendBonus += 0.3;
+                if(drop.balance === game.trends.balance) trendBonus += 0.2;
+                if(Math.abs(drop.grip - game.trends.grip) <= 1) trendBonus += 0.1;
+                if(trendBonus === 1.0) trendBonus = 0.5; // Penalty
+                demand *= trendBonus;
+
+                if(drop.weightOptions >= 3) demand *= 1.2;
+                if(drop.price > 80 && drop.packaging === 'blister') demand *= 0.6; 
+                if(drop.price > 120 && drop.packaging !== 'premium') demand *= 0.5;
+
+                if (drop.type === 'drop') {
+                    demand *= Math.max(0.05, 1 - (drop.age * 0.35)); 
+                } else {
+                    demand *= 0.3; 
+                    demand *= Math.max(0.5, 1 - (drop.age * 0.02)); 
+                }
+
+                let unitsSold = Math.floor(demand * (0.8 + Math.random() * 0.4));
+                if (drop.sold + unitsSold > drop.totalRun) unitsSold = drop.totalRun - drop.sold; // Always strictly limited
+
+                drop.sold += unitsSold;
+                drop.age++;
+                let revenue = unitsSold * drop.price;
+                totalRevenue += revenue;
+                drop.lastWeekSales = revenue;
+
+                let soldOut = drop.sold >= drop.totalRun;
+                // Dead stock check only for drops, Core stays until sold out
+                let deadStock = (drop.type === 'drop' && drop.age > 8);
+
+                if (soldOut || deadStock) {
+                    game.activeDrops.splice(i, 1);
+                    if (soldOut) {
+                        game.reputation += 2;
+                        // Check if legacy already exists to update or push new
+                        let existing = game.legacyDarts.find(d => d.name === drop.name);
+                        if(existing) {
+                            existing.sold += drop.sold;
+                        } else {
+                            game.legacyDarts.push({ ...drop, date: game.week });
+                        }
+                    }
+                }
+            }
+            game.cash += totalRevenue;
+        }
+
+        function simulateTournaments() {
+            if(game.team.length === 0) return;
+            game.team.forEach(p => {
+                let skillVal = p.skill === 'Low' ? 20 : (p.skill === 'Med' ? 50 : 80);
+                let techBoost = (game.lathe.level * 2) + 5;
+                let roll = Math.random() * 100;
+                let target = 100 - (skillVal + techBoost);
+                if (roll > target) {
+                    p.wins++;
+                    let prize = p.skill === 'Low' ? 2000 : 10000;
+                    game.cash += prize;
+                    game.reputation += 2;
+                    game.hype += 10;
+                }
+            });
+        }
+
+        // --- MANUFACTURING & LOGIC ---
+
+        function randomizeTrends() {
+            game.trends.shape = TREND_SHAPES[Math.floor(Math.random() * TREND_SHAPES.length)];
+            game.trends.balance = TREND_BALANCES[Math.floor(Math.random() * TREND_BALANCES.length)];
+            game.trends.grip = Math.floor(Math.random() * 4) + 1;
+        }
+
+        // Renamed/Repurposed to just be a visual updater for Batch Size slider
+        document.getElementById('batch-slider').addEventListener('input', (e) => {
+            document.getElementById('batch-display').innerText = e.target.value;
+            updateEstimates();
+        });
+
+        function startProject() {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot start projects while in debt."); return; }
+            if (game.project) { showModal("Error", "Finish current project first!"); return; }
+            if (game.lathe.health <= 0) { showModal("Broken", "Lathe is broken."); return; }
+
+            const tungsten = parseInt(document.getElementById('tungsten-slider').value);
+            const weightOpts = parseInt(document.getElementById('weight-options').value);
+            const shape = document.getElementById('shape-select').value;
+            const grip = parseInt(document.getElementById('grip-select').value);
+            const pack = document.getElementById('packaging-select').value;
+            const edition = document.getElementById('edition-select').value;
+            const name = document.getElementById('design-name').value || "Unnamed Dart";
+            const price = parseInt(document.getElementById('price-slider').value);
+            const batchSize = parseInt(document.getElementById('batch-slider').value);
+
+            let devCost = 1000 + ((tungsten - 80) * 200);
+            if(weightOpts > 1) devCost += (weightOpts * 500);
+            if(shape !== 'straight') devCost += 2000;
+            if(edition.includes('ip')) devCost += 5000;
+            if(edition === 'player') devCost += 5000;
+
+            // Unit Cost includes current Tungsten Market Price indirectly
+            // Base unit cost + (Tungsten Price * Weight Factor)
+            // Lets assume 20g dart = 0.02kg. At €50/kg = €1 raw material.
+            let matCost = (game.tungstenPrice / 1000) * 25; // 25g avg
+            let laborCost = 5 + ((tungsten - 80) * 0.5);
+            let unitCost = matCost + laborCost + (grip*0.5);
+            if(pack === 'box') unitCost += 1;
+            if(pack === 'premium') unitCost += 4;
+
+            let totalCost = devCost + (unitCost * batchSize);
+
+            if (game.cash < totalCost) { showModal("Funds", `Need €${totalCost.toLocaleString()} for this run.`); return; }
+            
+            game.cash -= totalCost;
+
+            const engPower = game.staff.engineer.count * game.staff.engineer.stars;
+            const desPower = game.staff.design.count * game.staff.design.stars;
+            let quality = tungsten + (engPower * 4) + (game.lathe.level * 5) + (desPower * 2) + (grip * 2);
+            if (game.tech.points) quality += 5;
+            
+            game.project = {
+                name, progress: 0, quality, price, 
+                shape, grip, balance: currentBalance, 
+                packaging: pack, weightOptions: weightOpts,
+                edition: edition,
+                totalRun: batchSize,
+                isRestock: false
+            };
+
+            const speed = 10 + (engPower * 5) + (game.lathe.level * 5);
+            // Time scales with batch size a bit
+            // Base time 100 units. +10 units per 1000 items?
+            let workload = 100 + (batchSize / 100);
+            const weeks = Math.ceil(workload / speed);
+
+            switchTab('dashboard');
+            saveGame();
+            updateUI();
+            
+            showModal("Production Started", `Producing ${batchSize} units.\nEst. Time: ${weeks} weeks.\n\nTip: Go to Marketing to build hype!`);
+        }
+
+        function startRestock(dartIdx, isLegacy) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot restock while in debt."); return; }
+            if (game.project) { showModal("Busy", "Production line occupied."); return; }
+            
+            // For now, simple modal to ask quantity
+            showInputModal("Restock Order", "Enter Quantity (500-10000):", (val) => {
+                let qty = parseInt(val);
+                if(!qty || qty < 500) qty = 500;
+                
+                // Fetch source dart
+                let source = isLegacy ? game.legacyDarts[dartIdx] : game.activeDrops[dartIdx];
+                
+                // Recalculate Unit Cost based on CURRENT market prices
+                // Simplified recalc logic
+                let matCost = (game.tungstenPrice / 1000) * 25; 
+                // We don't have the exact original inputs easily available without storing them all in the dart object
+                // Let's approximate based on its quality/price
+                let laborCost = 8; // generic
+                let unitCost = matCost + laborCost; 
+                
+                let totalCost = unitCost * qty;
+                
+                if(game.cash < totalCost) {
+                    showModal("Funds", `Need €${totalCost.toLocaleString()} for materials & labor.`);
+                    return;
+                }
+                
+                game.cash -= totalCost;
+                
+                game.project = {
+                    ...source,
+                    progress: 0,
+                    totalRun: qty,
+                    isRestock: true,
+                    // keep original stats
+                };
+                
+                // Restock is faster
+                const engPower = game.staff.engineer.count * game.staff.engineer.stars;
+                const speed = (10 + (engPower * 5) + (game.lathe.level * 5)) * 1.5; // 50% faster
+                let workload = 100 + (qty / 100);
+                const weeks = Math.ceil(workload / speed);
+                
+                updateUI();
+                saveGame();
+                showModal("Restock Started", `Refilling ${source.name} x${qty}.\nEst Time: ${weeks} weeks.`);
+            });
+        }
+
+        function finishProjectProduction() {
+            let p = game.project;
+            
+            // If restock, just add to inventory immediately or create new batch?
+            if(p.isRestock) {
+                // If legacy, move to active. If active, add to count.
+                // Actually simpler to just push a new active drop batch
+                game.activeDrops.push({
+                    ...p,
+                    type: 'core', // Restocks usually treated as core/steady
+                    inventory: p.totalRun,
+                    sold: 0,
+                    age: 0,
+                    isLimited: false,
+                    lastWeekSales: 0
+                });
+                game.project = null;
+                showModal("Restock Complete", `${p.name} batch of ${p.totalRun} units is now selling.`);
+                saveGame();
+                updateUI();
+                return;
+            }
+
+            // Clean modal state
+            const btn = document.getElementById('modal-confirm-btn');
+            btn.onclick = null; 
+            
+            document.getElementById('modal-title').innerText = "Production Complete";
+            document.getElementById('modal-content').innerText = `${p.name} is ready. Choose launch strategy:`;
+            document.getElementById('modal-input-container').classList.add('hidden');
+            document.getElementById('launch-options').classList.remove('hidden'); 
+            document.getElementById('modal-confirm-btn').classList.add('hidden');
+            document.getElementById('modal-cancel-btn').classList.add('hidden'); 
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function finalizeLaunch(type) {
+            let p = game.project;
+            let isLimited = type === 'drop';
+            
+            let score = Math.min(100, Math.floor((p.quality * 0.6) + (game.reputation * 0.2) + Math.random() * 20));
+            
+            game.activeDrops.push({
+                ...p,
+                type: type,
+                inventory: p.totalRun, // Use batch size
+                sold: 0,
+                age: 0,
+                isLimited: isLimited,
+                lastWeekSales: 0
+            });
+            
+            game.project = null;
+            closeModal();
+            setTimeout(() => {
+                showModal("Launch Review", `Critics give it ${score}/100!`);
+            }, 500);
+            
+            saveGame();
+            updateUI();
+        }
+
+        function signPlayer(tier) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot sign players while in debt."); return; }
+            if(game.team.length >= 4) { showModal("Full", "Team roster full."); return; }
+            
+            let cost = tier === 'rookie' ? 2000 : (tier === 'pro' ? 10000 : 50000); 
+            if(game.cash < cost) { showModal("Funds", "Cannot afford signing bonus."); return; }
+            
+            game.cash -= cost;
+            const names = ["Smith", "Wright", "Price", "Van Gerwen", "Anderson", "Littler", "Cross"];
+            const rName = names[Math.floor(Math.random()*names.length)] + " " + Math.floor(Math.random()*99);
+            
+            game.team.push({
+                name: rName,
+                skill: tier === 'rookie' ? 'Low' : (tier === 'pro' ? 'Med' : 'High'),
+                wins: 0,
+                id: Date.now()
+            });
+            updateUI();
+            saveGame();
+        }
+
+        // --- UI RENDERERS ---
+
+        function renderStaffControls() {
+            const roles = ['design', 'engineer', 'marketing'];
+            const container = document.getElementById('staff-container');
+            container.innerHTML = roles.map(r => {
+                const s = game.staff[r];
+                const label = r.charAt(0).toUpperCase() + r.slice(1);
+                let stars = '★'.repeat(s.stars) + '☆'.repeat(5-s.stars);
+                let cost = (r === 'engineer' ? 400 : (r === 'marketing' ? 350 : 300));
+                let hireCost = cost * 2.5;
+                let trainCost = 1000 + (s.stars * 500);
+                
+                return `
+                <div class="border-b border-gray-700 pb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <div>
+                            <div class="font-bold text-blue-400">${label} <span class="text-xs text-gray-500">(€${cost*s.count*s.stars}/wk)</span></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold">${s.count}</div>
+                            <div class="star-rating">${stars}</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="hire('${r}')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-xs py-2 rounded">Hire (€${hireCost})</button>
+                        <button onclick="train('${r}')" class="flex-1 bg-yellow-700 hover:bg-yellow-600 text-xs py-2 rounded">Train (€${trainCost})</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateUI() {
+            document.getElementById('company-name-display').innerText = game.companyName;
+            
+            const cashEl = document.getElementById('cash-display');
+            cashEl.innerText = `€${Math.floor(game.cash).toLocaleString()}`;
+            if(game.cash < 0) { cashEl.classList.remove('text-green-400'); cashEl.classList.add('text-red-500'); }
+            else { cashEl.classList.add('text-green-400'); cashEl.classList.remove('text-red-500'); }
+
+            document.getElementById('rep-display').innerText = game.reputation;
+            document.getElementById('fans-display').innerText = game.fans.toLocaleString();
+            document.getElementById('hype-display').innerText = Math.floor(game.hype) + '%';
+            document.getElementById('date-display').innerText = `Week ${game.week}`;
+            document.getElementById('accessory-income').innerText = `€${game.printers * 150}`;
+            document.getElementById('printer-count').innerText = game.printers;
+            // Market price is now informational only
+            document.getElementById('market-price').innerText = game.tungstenPrice;
+            document.getElementById('market-price-big').innerText = game.tungstenPrice;
+            // Stock displays removed, no ID 'tungsten-stock' needed in header except to perhaps show Price
+
+            if(game.trends) {
+                document.getElementById('trend-shape').innerText = game.trends.shape.toUpperCase();
+                document.getElementById('trend-grip').innerText = "Lvl " + game.trends.grip;
+                document.getElementById('trend-balance').innerText = game.trends.balance.toUpperCase();
+            }
+
+            document.getElementById('lathe-lvl').innerText = game.lathe.level;
+            const nextLatheCost = Math.floor(2000 * Math.pow(1.5, game.lathe.level));
+            document.getElementById('lathe-cost').innerText = nextLatheCost.toLocaleString();
+            
+            const laserBtnText = game.laser.level > 0 ? "Installed (Max)" : "Install (€5000)";
+            const laserSpan = document.getElementById('laser-btn-text');
+            if(laserSpan) laserSpan.innerText = laserBtnText;
+
+            updateMachineUI('lathe', game.lathe);
+            updateMachineUI('laser', game.laser);
+
+            const projectUI = document.getElementById('active-project-ui');
+            if (game.project) {
+                const percent = Math.floor(game.project.progress);
+                const isHalted = game.lathe.health <= 0;
+                projectUI.innerHTML = `
+                    <div class="flex justify-between mb-1">
+                        <span class="font-bold text-white">${game.project.name}</span>
+                        <span class="text-xs text-blue-300 font-bold">x${game.project.totalRun}</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-4 mb-2">
+                        <div class="${isHalted ? 'bg-red-500' : 'bg-blue-500'} h-4 rounded-full progress-bar" style="width: ${percent}%"></div>
+                    </div>
+                    <div class="text-xs text-gray-400">${isHalted ? 'HALTED' : (game.project.isRestock ? 'Restocking...' : 'Prototyping & Manufacturing...')}</div>
+                `;
+            } else {
+                projectUI.innerHTML = `<p class="text-gray-400 italic">No active project.</p>`;
+            }
+
+            const salesContainer = document.getElementById('sales-container');
+            if (game.activeDrops.length > 0) {
+                salesContainer.innerHTML = game.activeDrops.map((drop, idx) => {
+                    const isCore = drop.type === 'core';
+                    const isSoldOut = drop.sold >= drop.totalRun;
+                    
+                    let action = "";
+                    if(isSoldOut || drop.sold > drop.totalRun * 0.8) {
+                        action = `<button onclick="startRestock(${idx}, false)" class="mt-2 w-full bg-green-700 hover:bg-green-600 text-xs py-1 rounded">RESTOCK</button>`;
+                    }
+
+                    return `
+                    <div class="bg-gray-700 p-3 rounded border-l-4 ${isCore ? 'border-blue-500' : 'border-purple-500'}">
+                        <div class="flex justify-between font-bold">
+                            <span>${drop.name}</span>
+                            <span class="text-xs px-2 py-0.5 rounded ${isCore ? 'bg-blue-900' : 'bg-purple-900'}">${isCore ? 'CORE' : 'DROP'}</span>
+                        </div>
+                        <div class="text-xs text-gray-300">
+                            ${isSoldOut ? '<span class="text-red-400 font-bold">SOLD OUT</span>' : `Sold: ${drop.sold} / ${drop.totalRun}`}
+                        </div>
+                        <div class="text-xs text-gray-400">Rev: <span class="text-green-300">€${(drop.lastWeekSales || 0).toLocaleString()}</span></div>
+                        ${action}
+                    </div>`;
+                }).join('');
+            } else {
+                salesContainer.innerHTML = '<p class="text-gray-500">No active products.</p>';
+            }
+            
+            document.getElementById('legacy-list').innerHTML = game.legacyDarts.map((d, idx) => 
+                `<div class="flex justify-between items-center text-sm border-b border-gray-700 py-1">
+                    <span class="text-gray-400">${d.name} (Sold ${d.sold})</span>
+                    <button onclick="startRestock(${idx}, true)" class="bg-gray-600 hover:bg-gray-500 px-2 py-0.5 rounded text-xs">Revive</button>
+                </div>`
+            ).join('') || '<p class="text-gray-500 italic">No legacy products.</p>';
+
+            document.getElementById('pro-team-list').innerHTML = game.team.map(p => 
+                `<div class="flex justify-between bg-gray-700 p-2 rounded items-center">
+                    <div>
+                        <div class="font-bold">${p.name}</div>
+                        <div class="text-xs text-gray-400">${p.skill} Tier</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-yellow-400 font-bold"><i class="fa-solid fa-trophy"></i> ${p.wins}</div>
+                    </div>
+                </div>`
+            ).join('') || '<p class="text-gray-500 italic">No players signed.</p>';
+
+            renderStaffControls();
+            renderCompetitors();
+        }
+
+        // --- UTILS & HELPERS ---
+        
+        function updateMachineUI(id, machineObj) {
+            if(id === 'laser' && machineObj.level === 0) return;
+            const bar = document.getElementById(`${id}-health-bar`);
+            const text = document.getElementById(`${id}-health-text`);
+            const msg = document.getElementById(`${id}-broken-msg`);
+            const card = document.getElementById(`${id}-card`);
+            const hp = Math.max(0, machineObj.health);
+            bar.style.width = hp + '%';
+            bar.className = `health-bar-fill ${hp < 30 ? 'bg-red-500' : (hp < 60 ? 'bg-yellow-500' : 'bg-green-500')}`;
+            text.innerText = hp.toFixed(0) + '%';
+            if (hp <= 0) { msg.classList.remove('hidden'); card.classList.add('broken-machine'); } 
+            else { msg.classList.add('hidden'); card.classList.remove('broken-machine'); }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('border-l-4', 'border-blue-500', 'text-blue-400');
+                el.classList.add('border-transparent');
+            });
+        }
+        
+        let currentBalance = 'center';
+        let currentCoating = 'natural';
+
+        function setBalance(bal) {
+            currentBalance = bal;
+            ['front', 'center', 'rear'].forEach(b => {
+                const btn = document.getElementById(`bal-${b}`);
+                if(b === bal) { btn.classList.add('bg-blue-600', 'active-balance'); btn.classList.remove('bg-gray-700', 'border-transparent'); } 
+                else { btn.classList.remove('bg-blue-600', 'active-balance'); btn.classList.add('bg-gray-700', 'border-transparent'); }
+            });
+            updateEstimates();
+        }
+
+        function setCoating(style) {
+            currentCoating = style;
+            updateVisuals(); updateEstimates();
+        }
+
+        function updateVisuals() {
+            const shape = document.getElementById('shape-select').value;
+            const grip = parseInt(document.getElementById('grip-select').value);
+            const barrel = document.getElementById('preview-barrel');
+            const gripOverlay = document.getElementById('preview-grip');
+            const specs = document.getElementById('preview-specs');
+            barrel.className = 'w-32 h-8 dart-preview-barrel relative z-10 mx-0 overflow-hidden ' + 'shape-' + shape;
+            if (currentCoating !== 'natural') barrel.classList.add(currentCoating + '-coating');
+            let opacity = [0.2, 0.3, 0.5, 0.7][grip-1];
+            gripOverlay.style.opacity = opacity;
+            const tungsten = document.getElementById('tungsten-slider').value;
+            const shapeName = shape.charAt(0).toUpperCase() + shape.slice(1);
+            specs.innerHTML = `${tungsten}% W - ${shapeName}<br>Grip Lvl ${grip} - ${currentBalance.charAt(0).toUpperCase() + currentBalance.slice(1)}`;
+            
+            let match = 0;
+            if(game.trends) {
+                if(shape === game.trends.shape) match += 33;
+                if(currentBalance === game.trends.balance) match += 33;
+                if(Math.abs(grip - game.trends.grip) <= 0) match += 34;
+                else if(Math.abs(grip - game.trends.grip) <= 1) match += 15;
+            }
+            document.getElementById('meta-match-bar').style.width = match + '%';
+        }
+
+        function updateEstimates() {
+            const tungsten = parseInt(document.getElementById('tungsten-slider').value);
+            const weightOpts = parseInt(document.getElementById('weight-options').value);
+            const shape = document.getElementById('shape-select').value;
+            const grip = parseInt(document.getElementById('grip-select').value);
+            const pack = document.getElementById('packaging-select').value;
+            const edition = document.getElementById('edition-select').value;
+            const batchSize = parseInt(document.getElementById('batch-slider').value);
+
+            let devCost = 1000 + ((tungsten - 80) * 200);
+            if(weightOpts > 1) devCost += (weightOpts * 500);
+            if(shape !== 'straight') devCost += 2000;
+            if(edition.includes('ip')) devCost += 5000;
+            if(edition === 'player') devCost += 5000;
+
+            // DYNAMIC UNIT COST (No Stock, Direct Market)
+            // Approx cost per unit based on current Tungsten Price
+            // €50/kg -> 25g -> €1.25 material base. 
+            // Plus Labor base €5. Plus Tungsten difficulty.
+            
+            let matCost = (game.tungstenPrice / 1000) * 25; // 25g average
+            let laborCost = 5 + ((tungsten - 80) * 0.5);
+            let unitCost = matCost + laborCost + (grip * 0.5);
+            
+            if(pack === 'box') unitCost += 1;
+            if(pack === 'premium') unitCost += 4;
+
+            let totalCost = devCost + (unitCost * batchSize);
+
+            document.getElementById('dev-cost').innerText = `€${devCost.toLocaleString()}`;
+            document.getElementById('unit-cost').innerText = `€${unitCost.toFixed(2)}`;
+            document.getElementById('total-cost').innerText = `€${totalCost.toLocaleString()}`;
+        }
+
+        function hire(role) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot hire while in debt."); return; }
+            const s = game.staff[role];
+            let cost = (role === 'engineer' ? 400 : (role === 'marketing' ? 350 : 300)) * 2.5;
+            if (game.cash >= cost) { game.cash -= cost; s.count++; updateUI(); saveGame(); } 
+            else showModal("Funds", "Cannot afford hiring.");
+        }
+        function train(role) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot train while in debt."); return; }
+            const s = game.staff[role];
+            if(s.stars >= 5) return;
+            let cost = 1000 + (s.stars * 500);
+            if (game.cash >= cost) { game.cash -= cost; s.stars++; updateUI(); saveGame(); } 
+            else showModal("Funds", "Cannot afford training.");
+        }
+        function upgradeMachine(type) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot upgrade while in debt."); return; }
+            if(type === 'lathe') {
+                const cost = Math.floor(2000 * Math.pow(1.5, game.lathe.level));
+                if (game.cash >= cost) { 
+                    game.cash -= cost; 
+                    game.lathe.level++; 
+                    updateEstimates(); // Update Design Studio instantly
+                    updateUI(); 
+                    saveGame(); 
+                } else {
+                    showModal("Funds", `Need €${cost.toLocaleString()} to upgrade.`);
+                }
+            } else if(type === 'laser') {
+                if(game.laser.level===0 && game.cash >= 5000) { 
+                    game.cash -= 5000; 
+                    game.laser.level=1; 
+                    document.getElementById('laser-btn-text').innerText="Installed"; 
+                    updateUI(); 
+                    saveGame(); 
+                } else if(game.laser.level > 0) {
+                    showModal("Installed", "Laser Engraver is already installed.");
+                } else {
+                    showModal("Funds", "Need €5,000 for Laser Engraver.");
+                }
+            }
+        }
+        function repairMachine(type) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot repair while in debt."); return; }
+            let m = game[type];
+            if(m.level === 0 || m.health >= 100) return;
+            let cost = (100-m.health) * (type === 'lathe' ? 10 * m.level : 20);
+            if(game.cash >= cost) { game.cash -= cost; m.health = 100; updateUI(); saveGame(); }
+            else showModal("Funds", "Cannot afford repair.");
+        }
+        
+        function showModal(title, text) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-content').innerText = text;
+            document.getElementById('modal-input-container').classList.add('hidden');
+            document.getElementById('launch-options').classList.add('hidden');
+            document.getElementById('modal-confirm-btn').classList.remove('hidden');
+            document.getElementById('modal-cancel-btn').classList.add('hidden');
+            const btn = document.getElementById('modal-confirm-btn');
+            
+            // IMPORTANT: Reset click handler to default to prevent conflicts
+            btn.onclick = closeModal; 
+            btn.innerText = "Dismiss";
+            
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function showInputModal(title, text, cb) {
+            showModal(title, text);
+            document.getElementById('modal-input-container').classList.remove('hidden');
+            const btn = document.getElementById('modal-confirm-btn');
+            btn.innerText = "Confirm";
+            const confirmAction = () => {
+                try {
+                    const val = document.getElementById('modal-input').value;
+                    cb(val);
+                } catch(e) {
+                    console.error("Game Init Error:", e);
+                }
+                closeModal();
+            };
+            btn.onclick = confirmAction;
+            const input = document.getElementById('modal-input');
+            input.onkeypress = (e) => { if(e.key === 'Enter') confirmAction(); };
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        
+        // --- NEW RANKING LOGIC ---
+        function renderCompetitors() {
+            // Combine rivals + player
+            let all = [...game.competitors];
+            // Add player temporarily for sorting
+            all.push({ id: 'player', name: game.companyName, rep: game.reputation, isPlayer: true });
+            
+            // Sort by Reputation High -> Low
+            all.sort((a,b) => b.rep - a.rep);
+            
+            // Render Table
+            document.getElementById('rankings-table').innerHTML = all.map((c, index) => {
+                let rank = index + 1;
+                let isPlayer = c.isPlayer;
+                
+                let actionHtml = '';
+                if (isPlayer) {
+                    actionHtml = '<span class="text-blue-400 font-bold">YOU</span>';
+                } else if (c.bought) {
+                    actionHtml = '<span class="text-gray-500 font-bold">ACQUIRED</span>';
+                } else {
+                    // Logic: Can only buy if Player Rep > Rival Rep
+                    let canBuy = game.reputation > c.rep;
+                    let color = canBuy ? 'green' : 'gray';
+                    let disabled = canBuy ? '' : 'disabled style="opacity:0.5; cursor:not-allowed"';
+                    actionHtml = `<button onclick="buyCompetitor('${c.id}')" ${disabled} class="bg-${color}-700 hover:bg-${color}-600 px-3 py-1 text-xs rounded font-bold">
+                        Acquire €${c.cost.toLocaleString()}
+                    </button>`;
+                }
+
+                return `
+                <tr class="rank-row border-b border-gray-700 ${isPlayer ? 'rank-player' : ''} ${c.bought ? 'rank-owned' : ''}">
+                    <td class="p-3 font-mono text-gray-400">#${rank}</td>
+                    <td class="p-3 font-bold ${isPlayer ? 'text-white' : 'text-gray-300'}">${c.name}</td>
+                    <td class="p-3 text-yellow-400 font-mono">${c.rep.toLocaleString()}</td>
+                    <td class="p-3 text-right">${actionHtml}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function buyCompetitor(id) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot acquire while in debt."); return; }
+            let c = game.competitors.find(x => x.id === id);
+            
+            // Re-validate rank check
+            if (c && !c.bought) {
+                if (game.reputation <= c.rep) {
+                    showModal("Hostile Takeover Failed", "You must overtake their reputation ranking before you can acquire them.");
+                    return;
+                }
+                if (game.cash >= c.cost) {
+                    game.cash -= c.cost;
+                    c.bought = true;
+                    
+                    // Specific Rewards Mapping
+                    if(id === 'r20') { game.fans += 200; game.reputation += 10; showModal("Acquisition", "Dubz'n'Zubz bought! +200 Fans."); }
+                    else if(id === 'r16') { game.tech.points = true; showModal("Acquisition", "Sharp Shooters bought! Acquired Advanced Points Tech."); }
+                    else if(id === 'r15') { game.tech.flights = true; showModal("Acquisition", "Pointless Inc bought! Acquired Molded Flight Tech."); }
+                    else if(id === 'r3') { game.staff.engineer.count++; game.fans+=500; showModal("Acquisition", "FlightMaster bought! +1 Engineer."); }
+                    else if(id === 'r2') { game.reputation+=500; game.lathe.level++; showModal("Acquisition", "Bullseye Inc bought! Lathe Tech Upgraded."); }
+                    else if(id === 'r1') { game.hype+=100; game.fans+=5000; showModal("Acquisition", "Apex Global bought! You dominate the market."); }
+                    else {
+                        // Generic Reward for filler companies
+                        game.fans += 250;
+                        game.reputation += 25;
+                        showModal("Acquisition Complete", `You have acquired ${c.name}! +250 Fans, +25 Reputation.`);
+                    }
+                    
+                    updateUI();
+                    saveGame();
+                } else {
+                    showModal("Funds", "Not enough capital for this acquisition.");
+                }
+            }
+        }
+
+        function buyPrinter() { if(game.cash >= 1500) { game.cash -= 1500; game.printers++; updateUI(); saveGame(); } }
+        function promptRebrand() { if(game.cash >= 10000) showInputModal("Rebrand", "New Name:", n => { if(n){ game.cash-=10000; game.companyName=n; updateUI(); saveGame(); }}); }
+        function confirmReset() { if(confirm("Reset all progress?")) { localStorage.removeItem('dartTycoonUltSave'); location.reload(); } }
+
+        function sponsor(type) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot sponsor while in debt."); return; }
+            if (type === 'youtuber' && game.cash > 500) {
+                game.cash -= 500; game.hype += 25;
+                showModal("Sponsored!", "DartGuy180 released a video. Hype +25.");
+            } else if (type === 'influencer' && game.cash > 2500) {
+                game.cash -= 2500; game.hype += 60;
+                showModal("Sponsored!", "The Tungsten King shouted you out. Hype +60.");
+            }
+            saveGame(); updateUI();
+        }
+
+        function research(tech) {
+            if(game.cash < 0) { showModal("Bankrupt", "Cannot research while in debt."); return; }
+            let cost = 0;
+            if (tech === 'stems') cost = 1500;
+            if (tech === 'points') cost = 3000;
+            if (tech === 'flights') cost = 2000;
+            if (!game.tech[tech] && game.cash >= cost) {
+                game.cash -= cost; game.tech[tech] = true;
+                showModal("R&D Successful", `New ${tech} developed!`);
+                saveGame();
+            } else { showModal("Error", "Insufficient funds or already researched."); }
+        }
+
+        function runFanCompetition() {
+            if (game.cash >= 1000) {
+                game.cash -= 1000;
+                game.fans += 200; game.hype += 15;
+                showModal("Competition Complete", "Fans loved it! +200 Fans, +15 Hype.");
+                saveGame(); updateUI();
+            } else { showModal("Funds", "Not enough cash."); }
+        }
+
+        // Start
+        initGame();
+        
+        document.getElementById('tungsten-slider').addEventListener('input', (e) => { document.getElementById('tungsten-val').innerText = e.target.value + '%'; updateEstimates(); });
+        document.getElementById('price-slider').addEventListener('input', (e) => document.getElementById('price-display').innerText = e.target.value);
+
+    </script>
+</body>
+</html>
+
+
